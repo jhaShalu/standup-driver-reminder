@@ -23,7 +23,9 @@ def save_json(path, data):
 def send_reminder(webhook_url, driver):
     message = f"🚀 Reminder: Tomorrow's standup driver is *{driver}*."
     response = requests.post(webhook_url, json={"text": message})
-    response.raise_for_status()
+    if not response.ok:
+        print(f"HTTP {response.status_code} — {response.text}", file=sys.stderr)
+        response.raise_for_status()
 
 
 def main():

@@ -40,6 +40,10 @@ def main():
 
     tomorrow = datetime.date.today() + datetime.timedelta(days=1)
 
+    if tomorrow.weekday() >= 5:
+        print(f"Skipping: {tomorrow.strftime('%A, %B %d')} is a weekend.")
+        return
+
     driver = members[index]
     secondary = members[(index + 1) % len(members)]
     standup_date = f"{tomorrow.strftime('%B')} {tomorrow.day}, {tomorrow.year}"

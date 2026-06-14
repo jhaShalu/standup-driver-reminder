@@ -38,6 +38,7 @@ def send_reminder(webhook_url, driver, secondary, standup_date, upcoming):
 def main():
     dry_run = "--dry-run" in sys.argv
     show_rotation = "--show-rotation" in sys.argv
+    skip_names = [sys.argv[i + 1] for i, arg in enumerate(sys.argv) if arg == "--skip" and i + 1 < len(sys.argv)]
 
     config = load_json(CONFIG_FILE)
     state = load_json(STATE_FILE)
@@ -64,11 +65,21 @@ def main():
         print(f"Skipping: {tomorrow.strftime('%B %-d, %Y')} is a holiday.")
         return
 
-    driver = members[index]
-    secondary = members[(index + 1) % len(members)]
+    # Find actual driver, skipping anyone on leave (deferred — they drive next time)
+    actual_index = index
+    for _ in range(len(members)):
+        if members[actual_index] not in skip_names:
+            break
+        actual_index = (actual_index + 1) % len(members)
+    else:
+        print("Error: all members are skipped.", file=sys.stderr)
+        sys.exit(1)
+
+    driver = members[actual_index]
+    secondary = members[(actual_index + 1) % len(members)]
     standup_date = f"{tomorrow.strftime('%B')} {tomorrow.day}, {tomorrow.year}"
     upcoming_count = config.get("upcoming_count", 5)
-    upcoming = [members[(index + i) % len(members)] for i in range(1, upcoming_count + 1)]
+    upcoming = [members[(actual_index + i) % len(members)] for i in range(1, upcoming_count + 1)]
 
     if dry_run:
         upcoming_str = " → ".join(upcoming)
@@ -89,7 +100,9 @@ def main():
         save_json(HISTORY_FILE, history)
 
     if not dry_run:
-        state["index"] = (index + 1) % len(members)
+        # If someone was skipped, keep index at the deferred person so they drive next time
+        next_index = index if actual_index != index else (index + 1) % len(members)
+        state["index"] = next_index
         save_json(STATE_FILE, state)
 
 

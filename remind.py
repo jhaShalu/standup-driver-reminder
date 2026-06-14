@@ -8,6 +8,7 @@ import requests
 
 CONFIG_FILE = Path(__file__).parent / "config.json"
 STATE_FILE = Path(__file__).parent / "state.json"
+HISTORY_FILE = Path(__file__).parent / "history.json"
 
 
 def load_json(path):
@@ -46,7 +47,8 @@ def main():
 
     if show_rotation:
         driver = members[index]
-        upcoming = [members[(index + i) % len(members)] for i in range(1, 6)]
+        upcoming_count = config.get("upcoming_count", 5)
+        upcoming = [members[(index + i) % len(members)] for i in range(1, upcoming_count + 1)]
         print(f"Current driver: {driver}")
         print(f"📅 Upcoming:     {' → '.join(upcoming)}")
         return
@@ -57,10 +59,16 @@ def main():
         print(f"Skipping: {tomorrow.strftime('%A, %B %d')} is a weekend.")
         return
 
+    holidays = config.get("holidays", [])
+    if tomorrow.strftime("%Y-%m-%d") in holidays:
+        print(f"Skipping: {tomorrow.strftime('%B %-d, %Y')} is a holiday.")
+        return
+
     driver = members[index]
     secondary = members[(index + 1) % len(members)]
     standup_date = f"{tomorrow.strftime('%B')} {tomorrow.day}, {tomorrow.year}"
-    upcoming = [members[(index + i) % len(members)] for i in range(1, 6)]
+    upcoming_count = config.get("upcoming_count", 5)
+    upcoming = [members[(index + i) % len(members)] for i in range(1, upcoming_count + 1)]
 
     if dry_run:
         upcoming_str = " → ".join(upcoming)
@@ -76,6 +84,9 @@ def main():
             sys.exit(1)
         send_reminder(webhook_url, driver, secondary, standup_date, upcoming)
         print(f"Reminder sent. Driver: {driver} | Backup: {secondary} | Date: {standup_date}")
+        history = load_json(HISTORY_FILE) if HISTORY_FILE.exists() else []
+        history.append({"date": standup_date, "driver": driver, "backup": secondary})
+        save_json(HISTORY_FILE, history)
 
     if not dry_run:
         state["index"] = (index + 1) % len(members)

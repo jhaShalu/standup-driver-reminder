@@ -1,3 +1,15 @@
 {
-  "members": ["Ankita", "Inkeet", "Anagh", "Shalu", "Karn"]
+  "members": [
+    "Ankita",
+    "Inkeet",
+    "Anagh",
+    "Shalu",
+    "Karnnn"
+  ],
+  "upcoming_count": 5,
+  "holidays": [
+    "2026-12-25",
+    "2027-01-01",
+    "2027-08-15"
+  ]
 }

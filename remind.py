@@ -21,8 +21,13 @@ def save_json(path, data):
         f.write("\n")
 
 
-def send_reminder(webhook_url, driver, secondary, standup_date):
-    message = f"[{standup_date}]\nHeads up, team! *{driver}* is at the wheel for standup. See you there! | Backup: *{secondary}*"
+def send_reminder(webhook_url, driver, secondary, standup_date, upcoming):
+    upcoming_str = " → ".join(upcoming)
+    message = (
+        f"[{standup_date}]\n"
+        f"Heads up, team! *{driver}* is at the wheel for standup. See you there! | Backup: *{secondary}*\n\n"
+        f"📅 Upcoming: {upcoming_str}"
+    )
     response = requests.post(webhook_url, json={"text": message})
     if not response.ok:
         print(f"HTTP {response.status_code} — {response.text}", file=sys.stderr)
@@ -31,12 +36,20 @@ def send_reminder(webhook_url, driver, secondary, standup_date):
 
 def main():
     dry_run = "--dry-run" in sys.argv
+    show_rotation = "--show-rotation" in sys.argv
 
     config = load_json(CONFIG_FILE)
     state = load_json(STATE_FILE)
 
     members = config["members"]
     index = state["index"]
+
+    if show_rotation:
+        driver = members[index]
+        upcoming = [members[(index + i) % len(members)] for i in range(1, 6)]
+        print(f"Current driver: {driver}")
+        print(f"📅 Upcoming:     {' → '.join(upcoming)}")
+        return
 
     tomorrow = datetime.date.today() + datetime.timedelta(days=1)
 
@@ -47,15 +60,21 @@ def main():
     driver = members[index]
     secondary = members[(index + 1) % len(members)]
     standup_date = f"{tomorrow.strftime('%B')} {tomorrow.day}, {tomorrow.year}"
+    upcoming = [members[(index + i) % len(members)] for i in range(1, 6)]
 
     if dry_run:
-        print(f"[DRY RUN] [{standup_date}]\nHeads up, team! *{driver}* is at the wheel for standup. See you there! | Backup: *{secondary}*")
+        upcoming_str = " → ".join(upcoming)
+        print(
+            f"[DRY RUN] [{standup_date}]\n"
+            f"Heads up, team! *{driver}* is at the wheel for standup. See you there! | Backup: *{secondary}*\n\n"
+            f"📅 Upcoming: {upcoming_str}"
+        )
     else:
         webhook_url = os.environ.get("GCHAT_WEBHOOK_URL")
         if not webhook_url:
             print("Error: GCHAT_WEBHOOK_URL environment variable is not set.", file=sys.stderr)
             sys.exit(1)
-        send_reminder(webhook_url, driver, secondary, standup_date)
+        send_reminder(webhook_url, driver, secondary, standup_date, upcoming)
         print(f"Reminder sent. Driver: {driver} | Backup: {secondary} | Date: {standup_date}")
 
     if not dry_run:

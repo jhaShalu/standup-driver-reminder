@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 import sys
@@ -20,8 +21,8 @@ def save_json(path, data):
         f.write("\n")
 
 
-def send_reminder(webhook_url, driver):
-    message = f"🚀 Reminder: Tomorrow's standup driver is *{driver}*."
+def send_reminder(webhook_url, driver, secondary, standup_date):
+    message = f"[{standup_date}]\nHeads up, team! *{driver}* is at the wheel for standup. See you there! | Backup: *{secondary}*"
     response = requests.post(webhook_url, json={"text": message})
     if not response.ok:
         print(f"HTTP {response.status_code} — {response.text}", file=sys.stderr)
@@ -36,20 +37,26 @@ def main():
 
     members = config["members"]
     index = state["index"]
+
+    tomorrow = datetime.date.today() + datetime.timedelta(days=1)
+
     driver = members[index]
+    secondary = members[(index + 1) % len(members)]
+    standup_date = f"{tomorrow.strftime('%B')} {tomorrow.day}, {tomorrow.year}"
 
     if dry_run:
-        print(f"[DRY RUN] Tomorrow's standup driver would be: {driver}")
+        print(f"[DRY RUN] [{standup_date}]\nHeads up, team! *{driver}* is at the wheel for standup. See you there! | Backup: *{secondary}*")
     else:
         webhook_url = os.environ.get("GCHAT_WEBHOOK_URL")
         if not webhook_url:
             print("Error: GCHAT_WEBHOOK_URL environment variable is not set.", file=sys.stderr)
             sys.exit(1)
-        send_reminder(webhook_url, driver)
-        print(f"Reminder sent. Tomorrow's driver: {driver}")
+        send_reminder(webhook_url, driver, secondary, standup_date)
+        print(f"Reminder sent. Driver: {driver} | Backup: {secondary} | Date: {standup_date}")
 
-    state["index"] = (index + 1) % len(members)
-    save_json(STATE_FILE, state)
+    if not dry_run:
+        state["index"] = (index + 1) % len(members)
+        save_json(STATE_FILE, state)
 
 
 if __name__ == "__main__":
